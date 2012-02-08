@@ -1,5 +1,19 @@
-import spade, time, random
+import spade, time, random, math, hashlib
 host = '127.0.0.1'
+
+def segmentFile(file):
+	parts = 100
+	step = int(math.ceil(float(len(file)) / parts))
+	parts = [file[i*step:i*step+step] for i in range(parts)]
+
+	segments = dict()
+	cry = hashlib.sha1()
+	for part in parts:
+		cry.update(part)
+		segments[cry.hexdigest()] = part
+
+	return segments
+
 
 class TorrentAgent(spade.Agent.Agent):
 	def __init__(self, name):
@@ -24,8 +38,12 @@ class TorrentAgent(spade.Agent.Agent):
 
 # execution
 if __name__ == "__main__":
+	
+	file = ','.join([str(x) for x in range(1000)])
+	segments = segmentFile(file)
+
 	peer_count = 5
-	peers = [];
+	peers = []
 	for i in range(peer_count):
 		peers.append(TorrentAgent('peer' + str(i)))
 
