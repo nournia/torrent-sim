@@ -1,15 +1,21 @@
-import spade, time, random
+import spade, time, random, ast
 host = '127.0.0.1'
 
+have, want = {}, {}
 class TrackerAgent(spade.Agent.Agent):
 	class TrackerBehaviour(spade.Behaviour.EventBehaviour):
 		def _process(self):
 			msg = self._receive(True)
-			print "received message: ", msg.getContent()
+			mdict = ast.literal_eval(msg.getContent())
 
-	def _setup(self):
-		bhv = self.TrackerBehaviour()
-		self.addBehaviour(bhv, None)
+			def appendListToTable(di, li):
+				name = mdict['name']
+				for i in li:
+					if di.has_key(i): di[i] += [name]
+					else: di[i] = [name]
+
+			appendListToTable(have, mdict['have'])
+			appendListToTable(want, mdict['want'])
 
 	def _setup(self):
 		template = spade.Behaviour.ACLTemplate()

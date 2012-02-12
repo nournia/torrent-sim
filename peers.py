@@ -14,27 +14,30 @@ def segmentFile(file):
 
 	return segments
 
-
 class TorrentAgent(spade.Agent.Agent):
-	def __init__(self, name):
+	def __init__(self, name, want, have):
 		self._name = name
+		self._want = want
+		self._have = have
+
 		super(TorrentAgent, self).__init__(self._name +"@"+ host, "secret")
 		self.wui.start()
 		self.start()
 
+	def _setup(self):
+		bhv = self.TorrentBehaviour()
+		self.addBehaviour(bhv, None)
+
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
 		def _process(self):
-			self.askTracker(self.myAgent._name)
+			content = {'name': self.myAgent._name, 'want': self.myAgent._want, 'have': self.myAgent._have.keys()}
+			self.askTracker(content)
 
 		def askTracker(self, content):
 			msg = spade.ACLMessage.ACLMessage('request')
 			msg.addReceiver(spade.AID.aid("tracker@"+host,["xmpp://tracker@"+host]))
 			msg.setContent(content)
 			self.myAgent.send(msg)
-
-	def _setup(self):
-		bhv = self.TorrentBehaviour()
-		self.addBehaviour(bhv, None)
 
 # execution
 if __name__ == "__main__":
@@ -45,7 +48,12 @@ if __name__ == "__main__":
 	peer_count = 5
 	peers = []
 	for i in range(peer_count):
-		peers.append(TorrentAgent('peer' + str(i)))
+		if i == 0:
+			want = []; have = segments
+		else:
+			want = segments.keys(); have = {}
+
+		peers.append(TorrentAgent('peer' + str(i), want, have))
 
 	alive = True
 	while alive:
