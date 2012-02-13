@@ -1,4 +1,4 @@
-import spade, time, random, math, hashlib
+import spade, time, random, math, hashlib, ast
 host = '127.0.0.1'
 
 def segmentFile(file):
@@ -25,8 +25,25 @@ class TorrentAgent(spade.Agent.Agent):
 		self.start()
 
 	def _setup(self):
+		self._others = {}
+
 		bhv = self.TorrentBehaviour()
 		self.addBehaviour(bhv, None)
+
+		# register message receiver
+		template = spade.Behaviour.ACLTemplate()
+		template.addReceiver(spade.AID.aid(self._name + "@"+host, ["xmpp://"+ self._name +"@"+host]))
+		tmp = spade.Behaviour.MessageTemplate(template)
+		self.addBehaviour(self.ReceiveBehaviour(), tmp)
+
+	class ReceiveBehaviour(spade.Behaviour.EventBehaviour):
+		def _process(self):
+			msg = self._receive(True)
+			if msg.getContent().startswith('{'):
+				content = ast.literal_eval(msg.getContent())
+				self._others = content
+
+			print self._others
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
 		def _process(self):

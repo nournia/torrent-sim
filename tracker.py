@@ -14,8 +14,15 @@ class TrackerAgent(spade.Agent.Agent):
 					if di.has_key(i): di[i] += [name]
 					else: di[i] = [name]
 
+			# update have and want dicts
 			appendListToTable(have, mdict['have'])
 			appendListToTable(want, mdict['want'])
+
+			# reply sender with newest info
+			rep = msg.createReply()
+			rep.setPerformative('inform')
+			rep.setContent({'want': want, 'have': have})
+			self.myAgent.send(rep)
 
 	def _setup(self):
 		template = spade.Behaviour.ACLTemplate()
