@@ -14,8 +14,8 @@ class TrackerAgent(spade.Agent.Agent):
 			def appendListToTable(di, li):
 				name = mdict['name']
 				for i in li:
-					if di.has_key(i):
-						if not(name in di[i]): di[i].add(name)
+					if i in di:
+						if not name in di[i]: di[i] += [name]
 					else: di[i] = [name]
 
 			# update have and want dicts
@@ -25,7 +25,7 @@ class TrackerAgent(spade.Agent.Agent):
 			# reply sender with newest info
 			rep = msg.createReply()
 			rep.setPerformative('inform')
-			rep.setContent({'want': want, 'have': have})
+			rep.setContent({'type': 'tracker', 'want': want, 'have': have})
 			self.myAgent.send(rep)
 
 	def _setup(self):

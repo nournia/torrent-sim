@@ -19,7 +19,8 @@ def segmentFile(file):
 
 class TorrentAgent(spade.Agent.Agent):
 	def __init__(self, name, want, have):
-		self._name, self._want, self._have, self._others = name, want, have, {}
+		self._name, self._want, self._have, self._interests = name, want, have, {}
+		self._others = {'have': [], 'want': []}
 
 		super(TorrentAgent, self).__init__(getAddress(self._name), "secret")
 		self.wui.start()
@@ -37,18 +38,44 @@ class TorrentAgent(spade.Agent.Agent):
 	class ReceiveBehaviour(spade.Behaviour.EventBehaviour):
 		def _process(self):
 			msg = self._receive(True)
+
+			def addToDict(dic, key, value):
+				if not key in dic:
+					dic[key] = [value]
+				elif not value in dic[key]:
+					dic[key] += [value]
+
 			if msg.getContent().startswith('{'):
 				content = ast.literal_eval(msg.getContent())
-				self.myAgent._others = content
+				agent = self.myAgent
+
+				if content['type'] == 'tracker':
+					agent._others = content
+				elif content['type'] == 'interest':
+					addToDict(agent._interests, content['name'], content['segment'])
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
 		def _process(self):
-			content = {'name': self.myAgent._name, 'want': self.myAgent._want, 'have': self.myAgent._have.keys()}
-			self.askTracker(content)
+			agent = self.myAgent
 
-		def askTracker(self, content):
-			msg = spade.ACLMessage.ACLMessage('request')
-			msg.addReceiver(spade.AID.aid(getAddress('tracker'), ['xmpp://'+ getAddress('tracker')]))
+			# ask tracker
+			self.sendMsg('tracker', {'name': agent._name, 'want': agent._want, 'have': agent._have.keys()})
+
+			while 1:
+				try:
+					if agent._want:
+						# send interset message for random pieces
+						segment = random.choice(agent._want)
+						if segment in agent._others['have']:
+							peer = random.choice(agent._others['have'][segment])
+							self.sendMsg(peer, {'type': 'interest', 'name': agent._name, 'segment': segment})
+
+				except: pass
+				time.sleep(1)
+
+		def sendMsg(self, receiver, content, kind = 'inform'):
+			msg = spade.ACLMessage.ACLMessage(kind)
+			msg.addReceiver(spade.AID.aid(getAddress(receiver), ['xmpp://'+ getAddress(receiver)]))
 			msg.setContent(content)
 			self.myAgent.send(msg)
 
@@ -67,6 +94,7 @@ if __name__ == "__main__":
 			want = segments.keys(); have = {}
 
 		peers.append(TorrentAgent('peer' + str(i), want, have))
+		# peers[i].setDebugToScreen()
 
 	alive = True
 	while alive:
