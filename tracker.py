@@ -4,6 +4,9 @@ def getAddress(name):
 	host = '127.0.0.1'
 	return name +'@'+ host
 
+def getName(msg):
+	return msg.getSender().getName().split('@')[0]
+
 have, want = {}, {}
 class TrackerAgent(spade.Agent.Agent):
 	class TrackerBehaviour(spade.Behaviour.EventBehaviour):
@@ -12,7 +15,7 @@ class TrackerAgent(spade.Agent.Agent):
 			mdict = ast.literal_eval(msg.getContent())
 
 			def appendListToTable(di, li):
-				name = mdict['name']
+				name = getName(msg)
 				for i in li:
 					if i in di:
 						if not name in di[i]: di[i] += [name]

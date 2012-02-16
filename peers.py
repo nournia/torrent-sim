@@ -4,6 +4,9 @@ def getAddress(name):
 	host = '127.0.0.1'
 	return name +'@'+ host
 
+def getName(msg):
+	return msg.getSender().getName().split('@')[0]
+
 def segmentFile(file):
 	parts = 100
 	step = int(math.ceil(float(len(file)) / parts))
@@ -48,18 +51,19 @@ class TorrentAgent(spade.Agent.Agent):
 			if msg.getContent().startswith('{'):
 				content = ast.literal_eval(msg.getContent())
 				agent = self.myAgent
+				sender = getName(msg)
 
 				if content['type'] == 'tracker':
 					agent._others = content
 				elif content['type'] == 'interest':
-					addToDict(agent._interests, content['name'], content['segment'])
+					addToDict(agent._interests, sender, content['segment'])
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
 		def _process(self):
 			agent = self.myAgent
 
 			# ask tracker
-			self.sendMsg('tracker', {'name': agent._name, 'want': agent._want, 'have': agent._have.keys()})
+			self.sendMsg('tracker', {'want': agent._want, 'have': agent._have.keys()})
 
 			while 1:
 				try:
@@ -68,7 +72,7 @@ class TorrentAgent(spade.Agent.Agent):
 						segment = random.choice(agent._want)
 						if segment in agent._others['have']:
 							peer = random.choice(agent._others['have'][segment])
-							self.sendMsg(peer, {'type': 'interest', 'name': agent._name, 'segment': segment})
+							self.sendMsg(peer, {'type': 'interest', 'segment': segment})
 
 				except: pass
 				time.sleep(1)
