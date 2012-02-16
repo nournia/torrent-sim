@@ -1,5 +1,8 @@
 import spade, time, random, ast
-host = '127.0.0.1'
+
+def getAddress(name):
+	host = '127.0.0.1'
+	return name +'@'+ host
 
 have, want = {}, {}
 class TrackerAgent(spade.Agent.Agent):
@@ -27,13 +30,13 @@ class TrackerAgent(spade.Agent.Agent):
 
 	def _setup(self):
 		template = spade.Behaviour.ACLTemplate()
-		template.addReceiver(spade.AID.aid("tracker@"+host, ["xmpp://tracker@"+host]))
+		template.addReceiver(spade.AID.aid(getAddress('tracker'), ['xmpp://'+ getAddress('tracker')]))
 		self.addBehaviour(self.TrackerBehaviour(), spade.Behaviour.MessageTemplate(template))
 
 # execution
 if __name__ == "__main__":
 
-	tracker = TrackerAgent("tracker@"+ host, "secret")
+	tracker = TrackerAgent(getAddress('tracker'), "secret")
 	tracker.wui.start()
 	tracker.start()
 

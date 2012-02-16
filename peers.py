@@ -1,7 +1,7 @@
 import spade, time, random, math, hashlib, ast
-host = '127.0.0.1'
 
 def getAddress(name):
+	host = '127.0.0.1'
 	return name +'@'+ host
 
 def segmentFile(file):
@@ -19,17 +19,13 @@ def segmentFile(file):
 
 class TorrentAgent(spade.Agent.Agent):
 	def __init__(self, name, want, have):
-		self._name = name
-		self._want = want
-		self._have = have
+		self._name, self._want, self._have, self._others = name, want, have, {}
 
-		super(TorrentAgent, self).__init__(self._name +"@"+ host, "secret")
+		super(TorrentAgent, self).__init__(getAddress(self._name), "secret")
 		self.wui.start()
 		self.start()
 
 	def _setup(self):
-		self._others = {}
-
 		bhv = self.TorrentBehaviour()
 		self.addBehaviour(bhv, None)
 
