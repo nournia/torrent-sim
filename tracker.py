@@ -11,7 +11,8 @@ class TrackerAgent(spade.Agent.Agent):
 			def appendListToTable(di, li):
 				name = mdict['name']
 				for i in li:
-					if di.has_key(i): di[i] += [name]
+					if di.has_key(i):
+						if not(name in di[i]): di[i].add(name)
 					else: di[i] = [name]
 
 			# update have and want dicts
@@ -27,8 +28,7 @@ class TrackerAgent(spade.Agent.Agent):
 	def _setup(self):
 		template = spade.Behaviour.ACLTemplate()
 		template.addReceiver(spade.AID.aid("tracker@"+host, ["xmpp://tracker@"+host]))
-		tmp = spade.Behaviour.MessageTemplate(template)
-		self.addBehaviour(self.TrackerBehaviour(), tmp)
+		self.addBehaviour(self.TrackerBehaviour(), spade.Behaviour.MessageTemplate(template))
 
 # execution
 if __name__ == "__main__":

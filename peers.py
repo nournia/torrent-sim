@@ -1,6 +1,9 @@
 import spade, time, random, math, hashlib, ast
 host = '127.0.0.1'
 
+def getAddress(name):
+	return name +'@'+ host
+
 def segmentFile(file):
 	parts = 100
 	step = int(math.ceil(float(len(file)) / parts))
@@ -32,18 +35,15 @@ class TorrentAgent(spade.Agent.Agent):
 
 		# register message receiver
 		template = spade.Behaviour.ACLTemplate()
-		template.addReceiver(spade.AID.aid(self._name + "@"+host, ["xmpp://"+ self._name +"@"+host]))
-		tmp = spade.Behaviour.MessageTemplate(template)
-		self.addBehaviour(self.ReceiveBehaviour(), tmp)
+		template.addReceiver(spade.AID.aid(getAddress(self._name), ['xmpp://'+ getAddress(self._name)]))
+		self.addBehaviour(self.ReceiveBehaviour(), spade.Behaviour.MessageTemplate(template))
 
 	class ReceiveBehaviour(spade.Behaviour.EventBehaviour):
 		def _process(self):
 			msg = self._receive(True)
 			if msg.getContent().startswith('{'):
 				content = ast.literal_eval(msg.getContent())
-				self._others = content
-
-			print self._others
+				self.myAgent._others = content
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
 		def _process(self):
@@ -52,7 +52,7 @@ class TorrentAgent(spade.Agent.Agent):
 
 		def askTracker(self, content):
 			msg = spade.ACLMessage.ACLMessage('request')
-			msg.addReceiver(spade.AID.aid("tracker@"+host,["xmpp://tracker@"+host]))
+			msg.addReceiver(spade.AID.aid(getAddress('tracker'), ['xmpp://'+ getAddress('tracker')]))
 			msg.setContent(content)
 			self.myAgent.send(msg)
 
