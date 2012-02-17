@@ -28,8 +28,10 @@ class TorrentAgent(spade.Agent.Agent):
 		self._want = want # segment list
 		self._interest = [] # segment list
 
-		# have: sha1 indexed lists of peers, interest: which peer wants which segments
-		self._others = {'have': {}, 'interest': {}}
+		# have: sha1 indexed lists of peers
+		# interest: which peer wants which segments
+		# unchoke: list of unchoked peers
+		self._others = {'have': {}, 'interest': {}, 'unchoke': []}
 
 		super(TorrentAgent, self).__init__(getAddress(self._name), "secret")
 		self.wui.start()
@@ -64,6 +66,8 @@ class TorrentAgent(spade.Agent.Agent):
 					agent._others['have'] = content['have']
 				elif content['type'] == 'interest':
 					addToDict(agent._others['interest'], sender, content['segment'])
+				elif content['type'] == 'unchoke':
+					print sender, 'to', agent._name, ':', content
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
 		def _process(self):
@@ -74,14 +78,20 @@ class TorrentAgent(spade.Agent.Agent):
 
 			while 1:
 				try:
+					# send interset message
 					if agent._want:
-						# send interset message for random pieces
 						segment = random.choice(agent._want)
 						if segment in agent._others['have']:
 							peer = random.choice(agent._others['have'][segment])
 							self.sendMsg(peer, {'type': 'interest', 'segment': segment})
 							agent._interest.append(segment)
 							agent._want.remove(segment)
+
+					# send uchocke message
+					if len(agent._others['interest']) > 0:
+						peer = random.choice(list(set(agent._others['interest'].keys()) ^ set(agent._others['unchoke'])))
+						self.sendMsg(peer, {'type': 'unchoke'})
+						agent._others['unchoke'].append(peer)
 
 				except: pass
 				time.sleep(1)
