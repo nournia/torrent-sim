@@ -22,8 +22,14 @@ def segmentFile(file):
 
 class TorrentAgent(spade.Agent.Agent):
 	def __init__(self, name, want, have):
-		self._name, self._want, self._have, self._interests = name, want, have, {}
-		self._others = {'have': [], 'want': []}
+		self._segments = have # sha1 indexed strings
+		self._name = name # string
+		self._have = have.keys() # segment list
+		self._want = want # segment list
+		self._interest = [] # segment list
+
+		# have: sha1 indexed lists of peers, interest: which peer wants which segments
+		self._others = {'have': {}, 'interest': {}}
 
 		super(TorrentAgent, self).__init__(getAddress(self._name), "secret")
 		self.wui.start()
@@ -53,17 +59,18 @@ class TorrentAgent(spade.Agent.Agent):
 				agent = self.myAgent
 				sender = getName(msg)
 
+				# print sender, 'to', agent._name, ':', content
 				if content['type'] == 'tracker':
-					agent._others = content
+					agent._others['have'] = content['have']
 				elif content['type'] == 'interest':
-					addToDict(agent._interests, sender, content['segment'])
+					addToDict(agent._others['interest'], sender, content['segment'])
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
 		def _process(self):
 			agent = self.myAgent
 
 			# ask tracker
-			self.sendMsg('tracker', {'want': agent._want, 'have': agent._have.keys()})
+			self.sendMsg('tracker', {'have': agent._have})
 
 			while 1:
 				try:
@@ -73,6 +80,8 @@ class TorrentAgent(spade.Agent.Agent):
 						if segment in agent._others['have']:
 							peer = random.choice(agent._others['have'][segment])
 							self.sendMsg(peer, {'type': 'interest', 'segment': segment})
+							agent._interest.append(segment)
+							agent._want.remove(segment)
 
 				except: pass
 				time.sleep(1)
@@ -85,7 +94,7 @@ class TorrentAgent(spade.Agent.Agent):
 
 # execution
 if __name__ == "__main__":
-	
+
 	file = ','.join([str(x) for x in range(1000)])
 	segments = segmentFile(file)
 

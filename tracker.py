@@ -7,7 +7,7 @@ def getAddress(name):
 def getName(msg):
 	return msg.getSender().getName().split('@')[0]
 
-have, want = {}, {}
+have = {}
 class TrackerAgent(spade.Agent.Agent):
 	class TrackerBehaviour(spade.Behaviour.EventBehaviour):
 		def _process(self):
@@ -21,14 +21,12 @@ class TrackerAgent(spade.Agent.Agent):
 						if not name in di[i]: di[i] += [name]
 					else: di[i] = [name]
 
-			# update have and want dicts
 			appendListToTable(have, mdict['have'])
-			appendListToTable(want, mdict['want'])
 
 			# reply sender with newest info
 			rep = msg.createReply()
 			rep.setPerformative('inform')
-			rep.setContent({'type': 'tracker', 'want': want, 'have': have})
+			rep.setContent({'type': 'tracker', 'have': have})
 			self.myAgent.send(rep)
 
 	def _setup(self):
