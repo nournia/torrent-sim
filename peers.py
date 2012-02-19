@@ -20,17 +20,34 @@ def segmentFile(file):
 
 	return segments
 
+def addToDict(dic, key, value):
+	if not key in dic:
+		dic[key] = [value]
+	elif not value in dic[key]:
+		dic[key] += [value]
+
+def getKeys(dic, value):
+	keys = []
+	for key, vals in dic.items():
+		if value in vals:
+			keys.append(key)
+	return keys
+
+def listDiff(list1, list2):
+	return list(set(list1) ^ set(list2))
+
 class TorrentAgent(spade.Agent.Agent):
 	def __init__(self, name, want, have, bwUp, bwDown):
 		self._name, self._bwUp, self._bwDown = name, bwUp, bwDown
 		self._segments = have # sha1 indexed strings
 		self._have = have.keys() # segment list
 		self._want = want # segment list
-		self._interest = [] # segment list
+		self._interest = {} # I'm interested in these segment and sent interest message to peer values
+		self._unchoke = [] # These peers unchoked me
 
 		# have: sha1 indexed lists of peers
 		# interest: which peer wants which segments
-		# unchoked: list of unchoked peers
+		# unchoked: I unchocked these peers
 		self._others = {'have': {}, 'interest': {}, 'unchoked': []}
 
 		super(TorrentAgent, self).__init__(getAddress(self._name), "secret")
@@ -45,13 +62,6 @@ class TorrentAgent(spade.Agent.Agent):
 		template = spade.Behaviour.ACLTemplate()
 		template.addReceiver(spade.AID.aid(getAddress(self._name), ['xmpp://'+ getAddress(self._name)]))
 		self.addBehaviour(self.ReceiveBehaviour(), spade.Behaviour.MessageTemplate(template))
-
-	def getPeerPieces(self, peer):
-		pieces = []
-		for piece, peers in self._others['have'].items():
-			if peer in peers:
-				pieces.append(piece)
-		return pieces
 
 	def sendMsg(self, receiver, content, kind = 'inform'):
 		msg = spade.ACLMessage.ACLMessage(kind)
@@ -70,12 +80,6 @@ class TorrentAgent(spade.Agent.Agent):
 		def _process(self):
 			msg = self._receive(True)
 
-			def addToDict(dic, key, value):
-				if not key in dic:
-					dic[key] = [value]
-				elif not value in dic[key]:
-					dic[key] += [value]
-
 			if msg.getContent().startswith('{'):
 				content = ast.literal_eval(msg.getContent())
 				agent = self.myAgent
@@ -89,9 +93,10 @@ class TorrentAgent(spade.Agent.Agent):
 					addToDict(agent._others['interest'], sender, content['segment'])
 
 				elif content['type'] == 'unchoke':
-					pieces = agent.getPeerPieces(sender)
-					if pieces:
-						agent.replyMsg(msg, {'type': 'request', 'piece': random.choice(pieces), 'bw': agent._bwDown}, 'request')
+					agent._unchoke.append(sender)
+
+				elif content['type'] == 'choke':
+					agent._unchoke.remove(sender)
 
 				elif content['type'] == 'request':
 					if sender in agent._others['unchoked']:
@@ -117,7 +122,7 @@ class TorrentAgent(spade.Agent.Agent):
 						if segment in agent._others['have']:
 							peer = random.choice(agent._others['have'][segment])
 							agent.sendMsg(peer, {'type': 'interest', 'segment': segment})
-							agent._interest.append(segment)
+							addToDict(agent._interest, peer, segment)
 							agent._want.remove(segment)
 
 					# send uchocke message
@@ -125,6 +130,12 @@ class TorrentAgent(spade.Agent.Agent):
 						peer = random.choice(list(set(agent._others['interest'].keys()) ^ set(agent._others['unchoked'])))
 						agent.sendMsg(peer, {'type': 'unchoke', 'bw': agent._bwUp})
 						agent._others['unchoked'].append(peer)
+
+					# send request message
+					for peer in agent._unchoke:
+						pieces = listDiff(getKeys(agent._others['have'], peer), agent._have)
+						if pieces:
+							agent.sendMsg(peer, {'type': 'request', 'piece': random.choice(pieces), 'bw': agent._bwDown}, 'request')
 
 				except: pass
 				time.sleep(1)
