@@ -90,10 +90,16 @@ class TorrentAgent(spade.Agent.Agent):
 
 				elif content['type'] == 'unchoke':
 					pieces = agent.getPeerPieces(sender)
-					agent.replyMsg(msg, {'type': 'request', 'piece': random.choice(pieces), 'bw': bwDown}, 'request')
+					if pieces:
+						agent.replyMsg(msg, {'type': 'request', 'piece': random.choice(pieces), 'bw': agent._bwDown}, 'request')
 
 				elif content['type'] == 'request':
-					print sender, 'requests', agent._name, ':', content
+					if sender in agent._others['unchoked']:
+						agent.replyMsg(msg, {'type': 'piece', 'piece': content['piece'], 'segment': agent._segments[content['piece']], 'bw': agent._bwUp}, 'agree')
+
+				elif content['type'] == 'piece':
+					agent._segments[content['piece']] = content['segment']
+					agent._have.append(content['piece'])
 
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
@@ -117,7 +123,7 @@ class TorrentAgent(spade.Agent.Agent):
 					# send uchocke message
 					if len(agent._others['interest']) > 0:
 						peer = random.choice(list(set(agent._others['interest'].keys()) ^ set(agent._others['unchoked'])))
-						agent.sendMsg(peer, {'type': 'unchoke', 'bw': bwUp})
+						agent.sendMsg(peer, {'type': 'unchoke', 'bw': agent._bwUp})
 						agent._others['unchoked'].append(peer)
 
 				except: pass
