@@ -42,7 +42,7 @@ class TorrentAgent(spade.Agent.Agent):
 		self._segments = have # sha1 indexed strings
 		self._have = have.keys() # segment list
 		self._want = want # segment list
-		self._interest = {} # I'm interested in these segment and sent interest message to peer values
+		self._interest = {} # I sent interest message for these peers because of segments list
 		self._unchoke = [] # These peers unchoked me
 
 		# have: sha1 indexed lists of peers
@@ -92,11 +92,17 @@ class TorrentAgent(spade.Agent.Agent):
 				elif content['type'] == 'interest':
 					addToDict(agent._others['interest'], sender, content['segment'])
 
-				elif content['type'] == 'unchoke':
-					agent._unchoke.append(sender)
+				elif content['type'] == 'not-interest':
+					if sender in agent._others['interest']:
+						agent._others['interest'][sender].remove(content['segment'])
+						if not agent._others['interest'][sender]:
+							agent._others['interest'].remove(sender)
 
 				elif content['type'] == 'choke':
 					agent._unchoke.remove(sender)
+
+				elif content['type'] == 'unchoke':
+					agent._unchoke.append(sender)
 
 				elif content['type'] == 'request':
 					if sender in agent._others['unchoked']:
@@ -105,6 +111,10 @@ class TorrentAgent(spade.Agent.Agent):
 				elif content['type'] == 'piece':
 					agent._segments[content['piece']] = content['segment']
 					agent._have.append(content['piece'])
+					
+					peers = getKeys(agent._interest, content['piece'])
+					for peer in peers:
+						agent.sendMsg(peer, {'type': 'not-interest', 'segment': content['piece']})
 
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
