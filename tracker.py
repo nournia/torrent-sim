@@ -12,22 +12,37 @@ class TrackerAgent(spade.Agent.Agent):
 	class TrackerBehaviour(spade.Behaviour.EventBehaviour):
 		def _process(self):
 			msg = self._receive(True)
-			mdict = ast.literal_eval(msg.getContent())
 
-			def appendListToTable(di, li):
-				name = getName(msg)
-				for i in li:
-					if i in di:
-						if not name in di[i]: di[i] += [name]
-					else: di[i] = [name]
+			if msg.getContent().startswith('{'):
+				content = ast.literal_eval(msg.getContent())
+				sender = getName(msg)
+	
+				def appendListToTable(di, li):
+					for i in li:
+						if i in di:
+							if not sender in di[i]: di[i].append(sender)
+						else: di[i] = [sender]
 
-			appendListToTable(have, mdict['have'])
+				appendListToTable(have, content['have'])
 
-			# reply sender with newest info
-			rep = msg.createReply()
-			rep.setPerformative('inform')
-			rep.setContent({'type': 'tracker', 'have': have})
-			self.myAgent.send(rep)
+				# reply sender with newest info
+				rep = msg.createReply()
+				rep.setPerformative('inform')
+				rep.setContent({'type': 'tracker', 'have': have})
+				self.myAgent.send(rep)
+
+				# stats
+				clients = {}
+				for piece, peers in have.items():
+					for peer in peers:
+						if peer in clients:
+							clients[peer] += 1
+						else:
+							clients[peer] = 1
+
+				for name, pieces in clients.items():
+					print '{}: {}%'.format(name, pieces),
+				print
 
 	def _setup(self):
 		template = spade.Behaviour.ACLTemplate()

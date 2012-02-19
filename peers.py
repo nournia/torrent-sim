@@ -121,11 +121,13 @@ class TorrentAgent(spade.Agent.Agent):
 		def _process(self):
 			agent = self.myAgent
 
-			# ask tracker
 			agent.sendMsg('tracker', {'have': agent._have})
-
 			while 1:
 				try:
+					# ask tracker
+					if not random.randint(0, 5):
+						agent.sendMsg('tracker', {'have': agent._have})
+
 					# send interset message
 					if agent._want:
 						segment = random.choice(agent._want)
