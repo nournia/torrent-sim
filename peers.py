@@ -90,11 +90,11 @@ class TorrentAgent(spade.Agent.Agent):
 					agent._others['have'] = content['have']
 
 				elif content['type'] == 'interest':
-					addToDict(agent._others['interest'], sender, content['segment'])
+					addToDict(agent._others['interest'], sender, content['piece'])
 
 				elif content['type'] == 'not-interest':
 					if sender in agent._others['interest']:
-						agent._others['interest'][sender].remove(content['segment'])
+						agent._others['interest'][sender].pop(content['piece'])
 						if not agent._others['interest'][sender]:
 							agent._others['interest'].remove(sender)
 
@@ -110,11 +110,18 @@ class TorrentAgent(spade.Agent.Agent):
 
 				elif content['type'] == 'piece':
 					agent._segments[content['piece']] = content['segment']
-					agent._have.append(content['piece'])
-					
+					if content['piece'] not in agent._have:
+						agent._have.append(content['piece'])
+					if content['piece'] in agent._want:
+						agent._want.remove(content['piece'])
+
 					peers = getKeys(agent._interest, content['piece'])
 					for peer in peers:
-						agent.sendMsg(peer, {'type': 'not-interest', 'segment': content['piece']})
+						agent.sendMsg(peer, {'type': 'not-interest', 'piece': content['piece']})
+						agent._interest[peer].remove(content['piece'])
+
+					# print sender, 'to', agent._name
+					print agent._name, 'pieces:', len(agent._have), len(set(agent._have)), 'unchoke:', len(agent._unchoke)
 
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
@@ -130,12 +137,12 @@ class TorrentAgent(spade.Agent.Agent):
 
 					# send interset message
 					if agent._want:
-						segment = random.choice(agent._want)
-						if segment in agent._others['have']:
-							peer = random.choice(agent._others['have'][segment])
-							agent.sendMsg(peer, {'type': 'interest', 'segment': segment})
-							addToDict(agent._interest, peer, segment)
-							agent._want.remove(segment)
+						piece = random.choice(agent._want)
+						sent = getKeys(agent._interest, piece)
+						if not sent and piece in agent._others['have']:
+							peer = random.choice(agent._others['have'][piece])
+							agent.sendMsg(peer, {'type': 'interest', 'piece': piece})
+							addToDict(agent._interest, peer, piece)
 
 					# send uchocke message
 					if len(agent._others['interest']) > 0:
