@@ -94,9 +94,9 @@ class TorrentAgent(spade.Agent.Agent):
 
 				elif content['type'] == 'not-interest':
 					if sender in agent._others['interest']:
-						agent._others['interest'][sender].pop(content['piece'])
+						agent._others['interest'][sender].remove(content['piece'])
 						if not agent._others['interest'][sender]:
-							agent._others['interest'].remove(sender)
+							agent._others['interest'].pop(sender)
 
 				elif content['type'] == 'choke':
 					agent._unchoke.remove(sender)
