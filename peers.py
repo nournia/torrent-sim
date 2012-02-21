@@ -34,7 +34,7 @@ def getKeys(dic, value):
 	return keys
 
 def listDiff(list1, list2):
-	return list(set(list1) ^ set(list2))
+	return list(set(list1) - set(list2))
 
 class TorrentAgent(spade.Agent.Agent):
 	def __init__(self, name, want, have, bwUp, bwDown):
@@ -102,10 +102,11 @@ class TorrentAgent(spade.Agent.Agent):
 					agent._unchoke.remove(sender)
 
 				elif content['type'] == 'unchoke':
-					agent._unchoke.append(sender)
+					if not sender in agent._unchoke:
+						agent._unchoke.append(sender)
 
 				elif content['type'] == 'request':
-					if sender in agent._others['unchoked']:
+					if sender in agent._others['unchoked'] and content['piece'] in agent._segments:
 						agent.replyMsg(msg, {'type': 'piece', 'piece': content['piece'], 'segment': agent._segments[content['piece']], 'bw': agent._bwUp}, 'agree')
 
 				elif content['type'] == 'piece':
@@ -119,9 +120,6 @@ class TorrentAgent(spade.Agent.Agent):
 					for peer in peers:
 						agent.sendMsg(peer, {'type': 'not-interest', 'piece': content['piece']})
 						agent._interest[peer].remove(content['piece'])
-
-					# print sender, 'to', agent._name
-					print agent._name, 'pieces:', len(agent._have), len(set(agent._have)), 'unchoke:', len(agent._unchoke)
 
 
 	class TorrentBehaviour(spade.Behaviour.OneShotBehaviour):
@@ -139,14 +137,15 @@ class TorrentAgent(spade.Agent.Agent):
 					if agent._want:
 						piece = random.choice(agent._want)
 						sent = getKeys(agent._interest, piece)
-						if not sent and piece in agent._others['have']:
+						if (not sent) and piece in agent._others['have']:
 							peer = random.choice(agent._others['have'][piece])
-							agent.sendMsg(peer, {'type': 'interest', 'piece': piece})
-							addToDict(agent._interest, peer, piece)
+							if not peer in agent._unchoke:
+								agent.sendMsg(peer, {'type': 'interest', 'piece': piece})
+								addToDict(agent._interest, peer, piece)
 
 					# send uchocke message
 					if len(agent._others['interest']) > 0:
-						peer = random.choice(list(set(agent._others['interest'].keys()) ^ set(agent._others['unchoked'])))
+						peer = random.choice(listDiff(agent._others['interest'].keys(), agent._others['unchoked']))
 						agent.sendMsg(peer, {'type': 'unchoke', 'bw': agent._bwUp})
 						agent._others['unchoked'].append(peer)
 
