@@ -38,12 +38,16 @@ def listDiff(list1, list2):
 
 class TorrentAgent(spade.Agent.Agent):
 	def __init__(self, name, want, have, bwUp, bwDown):
-		self._name, self._bwUp, self._bwDown = name, bwUp, bwDown
+		self._name = name
 		self._segments = have # sha1 indexed strings
 		self._have = have.keys() # segment list
 		self._want = want # segment list
 		self._interest = {} # I sent interest message for these peers because of segments list
 		self._unchoke = [] # These peers unchoked me
+
+		# upload and download bandwidth
+		self._bw = {'up': bwUp, 'down': bwDown}
+		self._usedBw = {'up': {}, 'down': {}}
 
 		# have: sha1 indexed lists of peers
 		# interest: which peer wants which segments
@@ -53,6 +57,30 @@ class TorrentAgent(spade.Agent.Agent):
 		super(TorrentAgent, self).__init__(getAddress(self._name), "secret")
 		self.wui.start()
 		self.start()
+
+	def getBw(self, kind):
+		now = time.time()
+		bw = self._bw[kind]
+		bwMax = float(bw) / 5
+
+		valid = {}
+		for until, ubw in self._usedBw[kind].items():
+			if now < until:
+				bw -= ubw
+				valid[until] = ubw
+		self._usedBw[kind] = valid
+		
+		return min(bw, bwMax)
+	
+	def useBw(self, kind, peerBw, size):
+		bw = self.getBw(kind)
+		bw = min(bw, peerBw)
+		if bw > 0:
+			until = time.time() + 5 * float(size) / bw
+			self._usedBw[kind][until] = bw
+			return True
+
+		return False
 
 	def _setup(self):
 		bhv = self.TorrentBehaviour()
@@ -85,7 +113,7 @@ class TorrentAgent(spade.Agent.Agent):
 				agent = self.myAgent
 				sender = getName(msg)
 
-				# print sender, 'to', agent._name, ':', content
+				# print sender, 'to', agent._name, ':', content['type']
 				if content['type'] == 'tracker':
 					agent._others['have'] = content['have']
 
@@ -106,8 +134,10 @@ class TorrentAgent(spade.Agent.Agent):
 						agent._unchoke.append(sender)
 
 				elif content['type'] == 'request':
-					if sender in agent._others['unchoked'] and content['piece'] in agent._segments:
-						agent.replyMsg(msg, {'type': 'piece', 'piece': content['piece'], 'segment': agent._segments[content['piece']], 'bw': agent._bwUp}, 'agree')
+					if sender in agent._others['unchoked'] and content['piece'] in agent._segments and agent.getBw('up') > 0:
+						segment = agent._segments[content['piece']]
+						agent.replyMsg(msg, {'type': 'piece', 'piece': content['piece'], 'segment': segment, 'bw': agent.getBw('up')}, 'agree')
+						agent.useBw('up', content['bw'], len(segment))
 
 				elif content['type'] == 'piece':
 					agent._segments[content['piece']] = content['segment']
@@ -115,6 +145,7 @@ class TorrentAgent(spade.Agent.Agent):
 						agent._have.append(content['piece'])
 					if content['piece'] in agent._want:
 						agent._want.remove(content['piece'])
+					agent.useBw('down', content['bw'], len(content['segment']))
 
 					peers = getKeys(agent._interest, content['piece'])
 					for peer in peers:
@@ -143,17 +174,18 @@ class TorrentAgent(spade.Agent.Agent):
 								agent.sendMsg(peer, {'type': 'interest', 'piece': piece})
 								addToDict(agent._interest, peer, piece)
 
+					# send request message
+					if agent.getBw('down') > 0:
+						for peer in agent._unchoke:
+							pieces = listDiff(getKeys(agent._others['have'], peer), agent._have)
+							if pieces:
+								agent.sendMsg(peer, {'type': 'request', 'piece': random.choice(pieces), 'bw': agent.getBw('down')}, 'request')
+
 					# send uchocke message
 					if len(agent._others['interest']) > 0:
 						peer = random.choice(listDiff(agent._others['interest'].keys(), agent._others['unchoked']))
-						agent.sendMsg(peer, {'type': 'unchoke', 'bw': agent._bwUp})
+						agent.sendMsg(peer, {'type': 'unchoke', 'bw': agent.getBw('up')})
 						agent._others['unchoked'].append(peer)
-
-					# send request message
-					for peer in agent._unchoke:
-						pieces = listDiff(getKeys(agent._others['have'], peer), agent._have)
-						if pieces:
-							agent.sendMsg(peer, {'type': 'request', 'piece': random.choice(pieces), 'bw': agent._bwDown}, 'request')
 
 				except: pass
 				time.sleep(1)
