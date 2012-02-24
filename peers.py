@@ -140,6 +140,7 @@ class TorrentAgent(spade.Agent.Agent):
 						agent.useBw('up', content['bw'], len(segment))
 
 				elif content['type'] == 'piece':
+					print sender, agent._name
 					agent._segments[content['piece']] = content['segment']
 					if content['piece'] not in agent._have:
 						agent._have.append(content['piece'])
@@ -196,7 +197,7 @@ if __name__ == "__main__":
 	file = ','.join([str(x) for x in range(1000)])
 	segments = segmentFile(file)
 
-	peer_count = 5
+	peer_count = 10
 	peers = []
 	for i in range(peer_count):
 		if i == 0:
